@@ -5,7 +5,7 @@ import {EVMFetchTarget} from "@ensdomains/evm-verifier/contracts/EVMFetchTarget.
 import {OptiFetchTarget} from "./OptiFetchTarget.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
-import "../resolver/attester/OptiResolverAttesterBase.sol";
+import "../attester/OptiResolverAttesterBase.sol";
 import "./OptiL1ResolverMetadata.sol";
 import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";

@@ -26,7 +26,7 @@ error CCIPSlotOverflow();
 error PleaseWriteOnL2();
 error InvalidSlot();
 
-contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterBase {
+contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
     using Address for address;
 

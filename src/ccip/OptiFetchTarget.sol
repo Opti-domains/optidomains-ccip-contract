@@ -73,6 +73,7 @@ abstract contract OptiFetchTarget {
     error InvalidAttestation();
     error ResponseLengthMismatch(uint256 actual, uint256 expected);
     error OutputRootMismatch(uint256 l2OutputIndex, bytes32 expected, bytes32 actual);
+    error WildcardNotEnabled(bytes32 node);
 
     function getStorageValues(address target, bytes32[] memory commands, bytes[] memory constants, bytes memory proof)
         public
@@ -211,6 +212,10 @@ abstract contract OptiFetchTarget {
                 // For wildcard domain support that resolve from a parent domain
                 if (i < opPathLength) {
                     opNode = keccak256(abi.encodePacked(opNode, ensPaths[i]));
+                } else {
+                    if (!S.enableWildcard[ensNode]) {
+                        revert WildcardNotEnabled(ensNode);
+                    }
                 }
             }
         }

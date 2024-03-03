@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 library OptiL1ResolverMetadata {
     struct Layout {
         mapping(bytes32 => bytes32) domainMapping;
+        mapping(bytes32 => bool) enableWildcard;
         address[] officialResolvers;
         string[] gatewayURLs;
     }

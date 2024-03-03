@@ -15,6 +15,9 @@ import "./OptiL1ResolverMetadata.sol";
 // https://docs.optimism.io/chain/addresses
 address constant OP_L2_OUTPUT_ORACLE = 0xdfe97868233d1aa22e815a266982f2cf17685a27;
 
+// keccak256("CCIP_CALLBACK_SELECTOR")
+bytes32 constant CCIP_CALLBACK_SELECTOR = (0x008005059b29fe32430d77b550e3fd6faed6e319156c99f488cac9c10006b476);
+
 struct OPWitnessData {
     uint256 l2OutputIndex;
     Types.OutputRootProof outputRootProof;
@@ -68,7 +71,7 @@ abstract contract OptiFetchTarget {
     error InvalidENSNode();
     error InvalidAttestationUid();
     error InvalidAttestation();
-    error ImpossibleLengthMismatch();
+    error ResponseLengthMismatch(uint256 actual, uint256 expected);
     error OutputRootMismatch(uint256 l2OutputIndex, bytes32 expected, bytes32 actual);
 
     function getStorageValues(address target, bytes32[] memory commands, bytes[] memory constants, bytes memory proof)
@@ -86,6 +89,32 @@ abstract contract OptiFetchTarget {
             EVMProofHelper.getStorageValues(target, commands, constants, opData.outputRootProof.stateRoot, stateProof);
     }
 
+    function _storeSlotData(bytes32 slot, bytes memory data) internal pure {
+        assembly {
+            // Load the length of the data (first 32 bytes)
+            let dataLength := mload(data)
+
+            // Calculate the number of full words and the free memory pointer
+            let words := div(add(dataLength, 31), 32)
+            let dataStart := add(data, 32)
+            let p := mload(0x40)
+
+            // Store slot and data length to the first and second slot
+            mstore(p, slot)
+            mstore(add(p, 0x20), dataLength)
+
+            p := add(p, 0x40)
+
+            // Loop to copy each word from memory to storage
+            for { let i := 0 } lt(i, words) { i := add(i, 1) } {
+                let word := mload(add(dataStart, mul(i, 32)))
+                mstore(add(p, mul(i, 32)), word)
+            }
+
+            mstore(0x40, add(p, dataLength))
+        }
+    }
+
     /**
      * @dev CCIP Read callback logic to return resolver data with supplied attestations.
      *      Make public for testing and QA purpose.
@@ -94,7 +123,58 @@ abstract contract OptiFetchTarget {
         public
         view
     {
-        
+        unchecked {
+            uint256 slotsLength = slots.length;
+
+            if (attestations.length != slotsLength) {
+                revert ResponseLengthMismatch(attestations.length, slotsLength);
+            }
+
+            uint256 extraDataLength = 0;
+            bytes memory extraData;
+            
+            assembly {
+                // Allocate a byte for length
+                extraData := mload(0x40)
+
+                // Move pointer to next slot
+                mstore(0x40, add(extraData, 0x20))
+            }
+
+            for (uint256 i = 0; i < slotsLength; ++i) {
+                _storeSlotData(slots[i], attestations[i].data);
+                extraDataLength += 64 + attestations[i].data.length;
+            }
+
+            assembly {
+                // Store the length of extraData
+                mstore(extraData, add(extraDataLength, 0x40))
+
+                // Load free memory pointer
+                let p := mload(0x40)
+
+                // Store length of original calldata
+                mstore(p, mload(callbackData))
+
+                p := add(p, 0x20)
+
+                // Calculate checksum: keccak256(block.prevrandao, CCIP_CALLBACK_SELECTOR)
+                mstore(p, prevrandao())
+                mstore(add(p, 0x20), CCIP_CALLBACK_SELECTOR)
+                let checksum := keccak256(p, 0x40)
+
+                // Store checksum to last byte
+                mstore(p, checksum)
+
+                // Move free memory pointer
+                mstore(0x40, add(p, 0x40))
+            }
+
+            bytes memory ret = address(this).functionStaticCall(abi.encodePacked(callbackData, extraData));
+            assembly {
+                return(add(ret, 32), mload(ret))
+            }
+        }
     }
 
     /**
@@ -147,7 +227,7 @@ abstract contract OptiFetchTarget {
         uint256 uidsLength = uids.length;
 
         if (uidsLength != slots.length) {
-            revert ImpossibleLengthMismatch();
+            revert ResponseLengthMismatch(uidsLength, slots.length);
         }
 
         // Stage 3: Verify attestations against UID

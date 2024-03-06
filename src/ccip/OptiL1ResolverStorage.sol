@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.24;
 
-library OptiL1ResolverMetadata {
+library OptiL1ResolverStorage {
     struct Layout {
         mapping(bytes32 => bytes32) domainMapping;
         mapping(bytes32 => bool) enableWildcard;
-        address[] officialResolvers;
-        string[] gatewayURLs;
     }
 
     bytes32 internal constant STORAGE_SLOT = keccak256("optidomains.resolver.l1.metadata");

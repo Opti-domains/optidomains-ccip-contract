@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.24;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {EVMFetcher} from "@ensdomains/evm-verifier/contracts/EVMFetcher.sol";
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
+import {IOptiL1ResolverMetadata} from "../metadata/IOptiL1ResolverMetadata.sol";
 
-address constant REGISTRY_ADDRESS = address(0);
-address constant BASE_OP_RESOLVER_ADDRESS = address(0);
+// TODO: We will deploy OptiL1ResolverMetadata and paste its address here
+address constant OPTI_L1_RESOLVER_METADATA = 0x0000000000000000000000000000000000000000;
 
 library OptiL1ResolverUtils {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
@@ -17,10 +18,11 @@ library OptiL1ResolverUtils {
             request.commands[commandIdx] | (bytes32(bytes1(op)) >> (8 * request.operationIdx++));
     }
 
-    function getOpResolverAddress(bytes32 opNode) public pure returns (address predictedAddress) {
-        bytes32 saltHash = keccak256(abi.encodePacked(REGISTRY_ADDRESS, opNode));
-        predictedAddress =
-            Clones.predictDeterministicAddress(BASE_OP_RESOLVER_ADDRESS, saltHash, BASE_OP_RESOLVER_ADDRESS);
+    function getOpResolverAddress(bytes32 opNode) public view returns (address predictedAddress) {
+        address opBaseResolver = IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).opBaseResolver();
+        bytes32 saltHash =
+            keccak256(abi.encodePacked(IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).opRegistry(), opNode));
+        predictedAddress = Clones.predictDeterministicAddress(opBaseResolver, saltHash, opBaseResolver);
     }
 
     function buildAttFetchRequest(bytes32 opNode, bytes32[] calldata slots)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.24;
 
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
 import {RLPReader} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPReader.sol";
@@ -10,7 +10,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Attestation} from "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
 
 import "./OptiL1ResolverUtils.sol";
-import "./OptiL1ResolverMetadata.sol";
+import "./OptiL1ResolverStorage.sol";
 
 // https://docs.optimism.io/chain/addresses
 address constant OP_L2_OUTPUT_ORACLE = 0xdfe97868233d1aa22e815a266982f2cf17685a27;
@@ -182,7 +182,7 @@ abstract contract OptiFetchTarget {
      * @dev Internal callback function invoked by CCIP-Read in response to an attestation resolve request.
      */
     function ccipAttCallback(bytes calldata response, bytes calldata extradata) public view {
-        OptiL1ResolverMetadata.Layout storage S = OptiL1ResolverMetadata.layout();
+        OptiL1ResolverStorage.Layout storage S = OptiL1ResolverStorage.layout();
 
         (
             bytes32 ensCommonNode,

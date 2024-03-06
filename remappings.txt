@@ -6,4 +6,4 @@ forge-std/=lib/forge-std/src/
 @ensdomains/op-verifier/=lib/evmgateway/op-verifier/
 @ethereum-attestation-service/eas-contracts/contracts/=lib/eas-contracts/contracts/
 @eth-optimism/contracts-bedrock/=lib/optimism/packages/contracts-bedrock/
-@optidomains/modular-ens-contracts/=lib/modular-ens-contracts/contracts
+@optidomains/modular-ens-contracts/=lib/modular-ens-contracts/src/

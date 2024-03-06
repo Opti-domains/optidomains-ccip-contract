@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.24;
 
 import {EVMFetchTarget} from "@ensdomains/evm-verifier/contracts/EVMFetchTarget.sol";
 import {OptiFetchTarget} from "./OptiFetchTarget.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
-import "../attester/OptiResolverAttesterBase.sol";
-import "./OptiL1ResolverMetadata.sol";
+import "@optidomains/modular-ens-contracts/current/resolver/attester/OptiResolverAttesterBase.sol";
+import "../metadata/IOptiL1ResolverMetadata.sol";
+import "./OptiL1ResolverStorage.sol";
 import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";
 
@@ -121,39 +122,15 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
         }
     }
 
-    function _processCCIPFallback(bytes memory response) private pure {
-        uint256 responseLength = response.length;
-
-        if (responseLength == 0) return;
-
-        bytes memory emptyBytes = new bytes(responseLength);
-
-        // Empty primitive data types
-        if (keccak256(response) == keccak256(emptyBytes)) return;
-
-        // Empty bytes memory
-        if (responseLength >= 64) {
-            emptyBytes[31] = 0x20;
-            if (keccak256(response) == keccak256(emptyBytes)) return;
-        }
-
-        // Return response and skip every step ahead
-        assembly {
-            // Return response removing length prefix (0x20)
-            return(add(response, 0x20), responseLength)
-        }
-    }
-
     function _intCCIPFallback() private view {
         unchecked {
-            address[] storage officialResolvers = OptiL1ResolverMetadata.layout().officialResolvers;
-            uint256 officialResolversLength = officialResolvers.length;
+            (bool success, bytes memory response) = OPTI_L1_RESOLVER_METADATA.staticcall(msg.data);
 
-            for (uint256 i = 1; i <= officialResolversLength; ++i) {
-                (bool success, bytes memory response) =
-                    officialResolvers[officialResolversLength - i].staticcall(msg.data);
-                if (success) {
-                    _processCCIPFallback(response);
+            if (success) {
+                // Forward low level call return data
+                assembly {
+                    // Return response removing length prefix (0x20)
+                    return(add(response, 0x20), mload(response))
                 }
             }
         }
@@ -197,7 +174,7 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
     event CCIPSlot(bytes32 slot);
 
     function _finalizeCCIP() private view {
-        OptiL1ResolverMetadata.Layout storage S = OptiL1ResolverMetadata.layout();
+        OptiL1ResolverStorage.Layout storage S = OptiL1ResolverStorage.layout();
 
         unchecked {
             bytes32[] memory slots;
@@ -247,7 +224,7 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
 
             revert OffchainLookup(
                 address(this),
-                S.gatewayURLs,
+                IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).gatewayURLs(),
                 abi.encodeCall(IOptiL1Gateway.getAttestations, (ensNode, slots, dnsEncodedName)),
                 OptiFetchTarget.ccipAttCallback.selector,
                 abi.encode(ensNode, slots, msg.data)
@@ -260,7 +237,7 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
         view
         virtual
         override
-        returns (bytes memory)
+        returns (bytes memory result)
     {
         bool isCallback;
         assembly {
@@ -276,7 +253,7 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
             if (slot != s) {
                 revert InvalidSlot();
             }
-            return data;
+            result = data;
         } else {
             _appendCCIPslot(s);
         }

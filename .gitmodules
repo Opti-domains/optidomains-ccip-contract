@@ -16,3 +16,6 @@
 [submodule "lib/eas-contracts"]
 	path = lib/eas-contracts
 	url = https://github.com/ethereum-attestation-service/eas-contracts
+[submodule "lib/modular-ens-contracts"]
+	path = lib/modular-ens-contracts
+	url = https://github.com/Opti-domains/modular-ens-contracts

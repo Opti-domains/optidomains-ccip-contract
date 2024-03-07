@@ -5,9 +5,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {EVMFetcher} from "@ensdomains/evm-verifier/contracts/EVMFetcher.sol";
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
 import {IOptiL1ResolverMetadata} from "../metadata/IOptiL1ResolverMetadata.sol";
-
-// TODO: We will deploy OptiL1ResolverMetadata and paste its address here
-address constant OPTI_L1_RESOLVER_METADATA = 0x0000000000000000000000000000000000000000;
+import {OPTI_L1_RESOLVER_METADATA} from "../metadata/OptiL1ResolverMetadataAddress.sol";
 
 library OptiL1ResolverUtils {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;

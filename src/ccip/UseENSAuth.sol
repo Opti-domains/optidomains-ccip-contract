@@ -9,7 +9,12 @@ address constant NAME_WRAPPER_MAINNET = 0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE256864
 address constant NAME_WRAPPER_SEPOLIA = 0x0635513f179D50A207757E05759CbD106d7dFcE8;
 
 contract UseENSAuth {
-    function isAuthorised(bytes32 node) internal view virtual returns (bool) {
+    function _extractSender() internal pure returns (address sender) {
+        uint256 length = msg.data.length;
+        return abi.decode(msg.data[length - 20:length], (address));
+    }
+
+    function isAuthorised(address sender, bytes32 node) internal view virtual returns (bool) {
         address owner = ENS(ENS_REGISTRY).owner(node);
         if (owner == NAME_WRAPPER_MAINNET) {
             owner = INameWrapper(NAME_WRAPPER_MAINNET).ownerOf(uint256(node));
@@ -17,6 +22,6 @@ contract UseENSAuth {
         if (owner == NAME_WRAPPER_SEPOLIA) {
             owner = INameWrapper(NAME_WRAPPER_SEPOLIA).ownerOf(uint256(node));
         }
-        return owner == msg.sender;
+        return owner == sender;
     }
 }

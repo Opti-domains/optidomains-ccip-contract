@@ -19,10 +19,7 @@ contract OptiL1ResolverFallback is Ownable, IOptiL1ResolverFallback {
     event SetWriteResolver(address indexed caller, address indexed addr);
     event SetCCIPResolver(address indexed caller, address indexed addr);
 
-    constructor(address _owner, address _writeResolver) Ownable(_owner) {
-        writeResolver = _writeResolver;
-        emit SetWriteResolver(msg.sender, _writeResolver);
-    }
+    constructor(address _owner) Ownable(_owner) {}
 
     function officialResolvers() public view returns (address[] memory) {
         return _officialResolvers;

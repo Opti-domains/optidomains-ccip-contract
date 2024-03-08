@@ -6,6 +6,7 @@ import {OptiFetchTarget} from "./OptiFetchTarget.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
 import "@optidomains/modular-ens-contracts/current/resolver/attester/OptiResolverAttesterBase.sol";
+import "@optidomains/modular-ens-contracts/current/resolver/auth/OptiResolverAuth.sol";
 import "../metadata/IOptiL1ResolverMetadata.sol";
 import "./OptiL1ResolverStorage.sol";
 import "./OptiL1ResolverUtils.sol";
@@ -27,7 +28,7 @@ error CCIPSlotOverflow();
 error PleaseWriteOnL2();
 error InvalidSlot();
 
-contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
+contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
     using Address for address;
 
@@ -174,8 +175,6 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
     event CCIPSlot(bytes32 slot);
 
     function _finalizeCCIP() private view {
-        OptiL1ResolverStorage.Layout storage S = OptiL1ResolverStorage.layout();
-
         unchecked {
             bytes32[] memory slots;
             assembly {
@@ -210,7 +209,7 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
                             let offset := calldataload(sub(calldataLength, 0x40))
 
                             // [length][...dnsEncodedName...]
-                            let dataLength := add(calldataload(offset), 1)
+                            let dataLength := add(calldataload(offset), 0x20)
 
                             // Copy calldata to memory starting at ptr
                             calldatacopy(dnsEncodedName, offset, dataLength)
@@ -259,17 +258,22 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
         }
     }
 
+    function _writeFallback() internal {
+        // This function will return globally
+        IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).write(msg.sender, msg.data);
+    }
+
     function _write(bytes32, address, uint64, bool, bytes memory, bytes memory)
         internal
         virtual
         override
         returns (bytes32)
     {
-        revert PleaseWriteOnL2();
+        _writeFallback();
     }
 
     function _revoke(bytes32, address, bytes memory) internal virtual override returns (bytes32) {
-        revert PleaseWriteOnL2();
+        _writeFallback();
     }
 
     function _ccipBefore() internal view virtual override {
@@ -294,5 +298,9 @@ contract OptidomainsL1ResolverAttester is OptiResolverAttesterBase {
         if (!isCallback) {
             _finalizeCCIP();
         }
+    }
+
+    function _isAuthorised(bytes32) internal view virtual override returns (bool) {
+        return true;
     }
 }

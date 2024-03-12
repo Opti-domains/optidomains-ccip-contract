@@ -27,22 +27,27 @@ contract OptiL1ResolverFallback is OwnableUpgradeable, IOptiL1ResolverFallback {
         return _officialResolvers;
     }
 
-    function appendOfficialResolver(address addr) external onlyOwner {
-        _officialResolvers.push(addr);
-        emit AppendOfficialResolver(msg.sender, addr);
+    function appendOfficialResolvers(address[] calldata addr) public onlyOwner {
+        unchecked {
+            uint256 addrLength = addr.length;
+            for (uint256 i; i < addrLength; ++i) {
+                _officialResolvers.push(addr[i]);
+                emit AppendOfficialResolver(msg.sender, addr[i]);
+            }
+        }
     }
 
-    function popOfficialResolver() external onlyOwner {
+    function popOfficialResolver() public onlyOwner {
         emit PopOfficialResolver(msg.sender, _officialResolvers[_officialResolvers.length - 1]);
         _officialResolvers.pop();
     }
 
-    function setWriteResolver(address addr) external onlyOwner {
+    function setWriteResolver(address addr) public onlyOwner {
         writeResolver = addr;
         emit SetWriteResolver(msg.sender, addr);
     }
 
-    function setCCIPResolver(address addr) external onlyOwner {
+    function setCCIPResolver(address addr) public onlyOwner {
         ccipResolver = addr;
         emit SetCCIPResolver(msg.sender, addr);
     }

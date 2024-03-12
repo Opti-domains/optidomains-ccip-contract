@@ -10,8 +10,6 @@ contract OptiL1ResolverMetadata is OptiL1ResolverFallback, IOptiL1ResolverMetada
     address public nameWrapper;
     string[] internal _gatewayURLs;
 
-    constructor(address _owner) OptiL1ResolverFallback(_owner) {}
-
     event SetOpRegistry(address indexed caller, address indexed addr);
     event SetOpBaseResolver(address indexed caller, address indexed addr);
     event SetNameWrapper(address indexed caller, address indexed addr);

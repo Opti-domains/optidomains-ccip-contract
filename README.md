@@ -24,7 +24,7 @@ $ forge build
 ### Test
 
 ```shell
-$ forge test --fork-url $FORK_URL
+$ source .env && forge test --fork-url $FORK_URL -vv
 ```
 
 ### Format

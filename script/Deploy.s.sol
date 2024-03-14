@@ -39,16 +39,31 @@ contract Deploy is Script {
     DiamondResolver public diamondResolver;
     OptiL1PublicResolverFallback public publicResolverFallback;
 
-    string RPC_URL = vm.envString("RPC_URL");
+    string RPC_URL;
 
-    address NAME_WRAPPER = vm.envAddress(string.concat("NAME_WRAPPER_", block.chainid.toString()));
-    address[] OFFICIAL_RESOLVERS = vm.envAddress(string.concat("OFFICIAL_RESOLVERS_", block.chainid.toString()), ",");
-    string[] GATEWAY_URLS = vm.envString("GATEWAY_URLS", ",");
+    address NAME_WRAPPER;
+    address[] OFFICIAL_RESOLVERS;
+    string[] GATEWAY_URLS;
 
-    bool UPGRADE_RESOLVER_METADATA = vm.envOr("UPGRADE_RESOLVER_METADATA", false);
-    bool UPGRADE_PUBLIC_RESOLVER_FALLBACK = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FALLBACK", false);
-    bool UPGRADE_PUBLIC_RESOLVER_FACET = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FACET", false);
-    bool UPGRADE_RESOLVER_CONTROLLER_FACET = vm.envOr("UPGRADE_RESOLVER_CONTROLLER_FACET", false);
+    bool UPGRADE_RESOLVER_METADATA;
+    bool UPGRADE_PUBLIC_RESOLVER_FALLBACK;
+    bool UPGRADE_PUBLIC_RESOLVER_FACET;
+    bool UPGRADE_RESOLVER_CONTROLLER_FACET;
+
+    modifier env() {
+        RPC_URL = vm.envString("RPC_URL");
+
+        NAME_WRAPPER = vm.envAddress(string.concat("NAME_WRAPPER_", block.chainid.toString()));
+        OFFICIAL_RESOLVERS = vm.envAddress(string.concat("OFFICIAL_RESOLVERS_", block.chainid.toString()), ",");
+        GATEWAY_URLS = vm.envString("GATEWAY_URLS", ",");
+
+        UPGRADE_RESOLVER_METADATA = vm.envOr("UPGRADE_RESOLVER_METADATA", false);
+        UPGRADE_PUBLIC_RESOLVER_FALLBACK = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FALLBACK", false);
+        UPGRADE_PUBLIC_RESOLVER_FACET = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FACET", false);
+        UPGRADE_RESOLVER_CONTROLLER_FACET = vm.envOr("UPGRADE_RESOLVER_CONTROLLER_FACET", false);
+
+        _;
+    }
 
     /// @notice Modifier that wraps a function in broadcasting.
     modifier broadcast() {
@@ -241,11 +256,11 @@ contract Deploy is Script {
         console2.log("DiamondResolver:", address(diamondResolver));
     }
 
-    function runBroadcast() public broadcast {
+    function runBroadcast() public env broadcast {
         _run();
     }
 
-    function runDebug() public debug {
+    function runDebug() public env debug {
         _run();
     }
 

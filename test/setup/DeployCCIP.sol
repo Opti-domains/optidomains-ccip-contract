@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console2} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Deploy, OptiL1ResolverMetadata, DiamondResolver, OptiL1PublicResolverFallback} from "script/Deploy.s.sol";
 

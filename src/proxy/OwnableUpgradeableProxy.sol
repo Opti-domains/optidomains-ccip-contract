@@ -13,6 +13,10 @@ contract OwnableUpgradeableProxy is Proxy, OwnableUpgradeable {
      */
     error ERC1967InvalidImplementation(address implementation);
 
+    constructor(address impl, address owner) {
+        _initialize(impl, owner);
+    }
+
     function _initialize(address impl, address owner) internal initializer {
         _setImplementation(impl);
         __Ownable_init(owner);

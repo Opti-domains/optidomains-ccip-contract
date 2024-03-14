@@ -20,7 +20,11 @@ import {OptiL1ResolverControllerFacet} from "src/facet/OptiL1ResolverControllerF
 address constant DEPLOYER = 0x424242554b027D8661cf60C87195949f8426BCA5;
 
 address constant CREATE3FACTORY = 0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf;
+
+// 0x4242ff8798CdDFf600c41c818F4f9d3E922B609f
 bytes32 constant RESOLVER_METADATA_SALT = 0x0000000000000000000000000000000000000000f75b656fc843dfea68723db7;
+
+// 0x4242008c912fEA62C3fe4C8d4Cd4eD3319738ef0
 bytes32 constant DIAMOND_RESOLVER_SALT = 0x0000000000000000000000000000000000000000ae1787e6c414de748181697a;
 
 address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
@@ -31,9 +35,9 @@ bytes32 constant OP_NAMEHASH = 0x070904f45402bbf3992472be342c636609db649a8ec20a8
 contract Deploy is Script {
     using Strings for uint256;
 
-    OptiL1ResolverMetadata resolverMetadata;
-    DiamondResolver diamondResolver;
-    OptiL1PublicResolverFallback publicResolverFallback;
+    OptiL1ResolverMetadata public resolverMetadata;
+    DiamondResolver public diamondResolver;
+    OptiL1PublicResolverFallback public publicResolverFallback;
 
     string RPC_URL = vm.envString("RPC_URL");
 
@@ -245,11 +249,19 @@ contract Deploy is Script {
         _run();
     }
 
+    function scratchpad() public {
+        OptiL1PublicResolverFallback resolver = OptiL1PublicResolverFallback(address(diamondResolver));
+        address addr = resolver.addr(0x1a63898c3849a1c65b7e5b98128ab7f7d61ba88b58e5c89f445b9ef5db234349);
+        console2.log(addr);
+    }
+
     function run() public {
         if (keccak256(abi.encode(RPC_URL)) == keccak256(abi.encode("http://127.0.0.1:8545"))) {
             runDebug();
         } else {
             runBroadcast();
         }
+
+        scratchpad();
     }
 }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ICREATE3Factory} from "lib/create3-factory/src/ICREATE3Factory.sol";
 import {DiamondResolver} from "@optidomains/modular-ens-contracts/current/diamond/DiamondResolver.sol";
@@ -13,15 +12,16 @@ import {
     OptiL1ResolverFallback,
     IOptiL1ResolverMetadata
 } from "src/metadata/OptiL1ResolverMetadata.sol";
+import {OwnableUpgradeableProxy} from "src/proxy/OwnableUpgradeableProxy.sol";
 import {OptiL1PublicResolverFallback, ENS, INameWrapper} from "src/fallback/OptiL1PublicResolverFallback.sol";
 import {OptiL1PublicResolverFacet} from "src/facet/OptiL1PublicResolverFacet.sol";
 import {OptiL1ResolverControllerFacet} from "src/facet/OptiL1ResolverControllerFacet.sol";
 
-address constant DEPLOYER = 0x4200000000000000000000000000000000000021;
+address constant DEPLOYER = 0x424242554b027D8661cf60C87195949f8426BCA5;
 
 address constant CREATE3FACTORY = 0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf;
-bytes32 constant RESOLVER_METADATA_SALT = 0x0000000000000000000000000000000000000000000000000000000000001234;
-bytes32 constant DIAMOND_RESOLVER_SALT = 0x0000000000000000000000000000000000000000000000000000000000002345;
+bytes32 constant RESOLVER_METADATA_SALT = 0x0000000000000000000000000000000000000000f75b656fc843dfea68723db7;
+bytes32 constant DIAMOND_RESOLVER_SALT = 0x0000000000000000000000000000000000000000ae1787e6c414de748181697a;
 
 address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
 address constant OP_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
@@ -34,6 +34,8 @@ contract Deploy is Script {
     OptiL1ResolverMetadata resolverMetadata;
     DiamondResolver diamondResolver;
     OptiL1PublicResolverFallback publicResolverFallback;
+
+    string RPC_URL = vm.envString("RPC_URL");
 
     address NAME_WRAPPER = vm.envAddress(string.concat("NAME_WRAPPER_", block.chainid.toString()));
     address[] OFFICIAL_RESOLVERS = vm.envAddress(string.concat("OFFICIAL_RESOLVERS_", block.chainid.toString()), ",");
@@ -59,6 +61,7 @@ contract Deploy is Script {
         UPGRADE_PUBLIC_RESOLVER_FACET = true;
         UPGRADE_RESOLVER_CONTROLLER_FACET = true;
 
+        vm.deal(DEPLOYER, 1000 ether);
         vm.startBroadcast(DEPLOYER);
         _;
         vm.stopBroadcast();
@@ -75,17 +78,27 @@ contract Deploy is Script {
     }
 
     function deployResolverMetadataProxy(address impl, address owner) internal returns (OptiL1ResolverMetadata, bool) {
-        bytes memory initCode = abi.encodeWithSelector(OptiL1ResolverFallback.initialize.selector, owner);
+        address target = ICREATE3Factory(CREATE3FACTORY).getDeployed(DEPLOYER, RESOLVER_METADATA_SALT);
+
+        if (target.code.length > 0) {
+            return (OptiL1ResolverMetadata(payable(target)), false);
+        }
 
         address deployed = ICREATE3Factory(CREATE3FACTORY).deploy(
             RESOLVER_METADATA_SALT,
-            abi.encodePacked(type(TransparentUpgradeableProxy).creationCode, abi.encode(impl, owner, initCode))
+            abi.encodePacked(type(OwnableUpgradeableProxy).creationCode, abi.encode(impl, owner))
         );
 
         return (OptiL1ResolverMetadata(payable(deployed)), true);
     }
 
     function deployDiamondResolver(address owner) internal returns (DiamondResolver, bool) {
+        address target = ICREATE3Factory(CREATE3FACTORY).getDeployed(DEPLOYER, DIAMOND_RESOLVER_SALT);
+
+        if (target.code.length > 0) {
+            return (DiamondResolver(payable(target)), false);
+        }
+
         address deployed = ICREATE3Factory(CREATE3FACTORY).deploy(
             DIAMOND_RESOLVER_SALT, abi.encodePacked(type(DiamondResolver).creationCode, abi.encode(owner))
         );
@@ -164,7 +177,13 @@ contract Deploy is Script {
         if (UPGRADE_RESOLVER_METADATA) {
             OptiL1ResolverMetadata resolverMetadataImpl = deployResolverMetadata();
             (resolverMetadata, resolverMetadataInitMode) =
-                deployResolverMetadataProxy(address(resolverMetadataImpl), msg.sender);
+                deployResolverMetadataProxy(address(resolverMetadataImpl), DEPLOYER);
+
+            if (!resolverMetadataInitMode) {
+                OwnableUpgradeableProxy(payable(address(resolverMetadata))).setImplementation(
+                    address(resolverMetadataImpl)
+                );
+            }
         } else {
             (resolverMetadata, resolverMetadataInitMode) = deployResolverMetadataProxy(address(0), msg.sender);
         }
@@ -173,11 +192,15 @@ contract Deploy is Script {
             publicResolverFallback = deployPublicResolverFallback(address(resolverMetadata));
 
             OFFICIAL_RESOLVERS.push(address(publicResolverFallback));
+
+            if (!resolverMetadataInitMode) {
+                resolverMetadata.setWriteResolver(address(publicResolverFallback));
+            }
         } else {
             publicResolverFallback = OptiL1PublicResolverFallback(resolverMetadata.writeResolver());
         }
 
-        (diamondResolver, diamondResolverInitMode) = deployDiamondResolver(msg.sender);
+        (diamondResolver, diamondResolverInitMode) = deployDiamondResolver(DEPLOYER);
 
         if (resolverMetadataInitMode) {
             resolverMetadata.initParams(
@@ -223,6 +246,10 @@ contract Deploy is Script {
     }
 
     function run() public {
-        runBroadcast();
+        if (keccak256(abi.encode(RPC_URL)) == keccak256(abi.encode("http://127.0.0.1:8545"))) {
+            runDebug();
+        } else {
+            runBroadcast();
+        }
     }
 }

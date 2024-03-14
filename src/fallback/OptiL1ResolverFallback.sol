@@ -19,10 +19,6 @@ contract OptiL1ResolverFallback is OwnableUpgradeable, IOptiL1ResolverFallback {
     event SetWriteResolver(address indexed caller, address indexed addr);
     event SetCCIPResolver(address indexed caller, address indexed addr);
 
-    function initialize(address owner) public initializer {
-        __Ownable_init(owner);
-    }
-
     function officialResolvers() public view returns (address[] memory) {
         return _officialResolvers;
     }

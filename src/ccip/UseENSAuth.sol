@@ -11,7 +11,10 @@ address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
 contract UseENSAuth {
     function _extractSender() internal pure returns (address sender) {
         uint256 length = msg.data.length;
-        return abi.decode(msg.data[length - 20:length], (address));
+        bytes memory senderRaw = msg.data[length - 20:length];
+        assembly {
+            sender := div(mload(add(senderRaw, 32)), exp(256, 12))
+        }
     }
 
     function isAuthorised(address sender, bytes32 node) internal view virtual returns (bool) {

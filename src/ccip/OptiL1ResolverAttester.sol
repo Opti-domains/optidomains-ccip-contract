@@ -11,6 +11,7 @@ import "../metadata/IOptiL1ResolverMetadata.sol";
 import "./OptiL1ResolverStorage.sol";
 import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";
+import {Script, console2} from "forge-std/Script.sol";
 
 uint256 constant FreeMemoryOccupied_error_signature =
     (0x3e9fd85b00000000000000000000000000000000000000000000000000000000);
@@ -81,17 +82,8 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
     function _initCCIPCallback() private pure {
         assembly {
-            // If free memory pointer is not at 0x80 then revert
-            if iszero(eq(mload(0x40), 0x80)) {
-                mstore(0, FreeMemoryOccupied_error_signature)
-                revert(0, FreeMemoryOccupied_error_length)
-            }
-
             // Allocate calldata pointer to the first slot
             mstore(0x80, calldataload(sub(calldatasize(), 0x40)))
-
-            // Move free memory pointer by 2 slot (_isCCIPCallback used 2 slot)
-            mstore(0x40, 0xC0)
         }
     }
 
@@ -144,13 +136,21 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
                 mstore(0, FreeMemoryOccupied_error_signature)
                 revert(0, FreeMemoryOccupied_error_length)
             }
+        }
 
-            // Move free memory pointer by 33 slots
-            mstore(0x40, 0x4A0)
+        // We need to allocate memory this way, otherwise solidity compiler may take over this slot.
+        bytes32[] memory allocation = new bytes32[](32);
+        allocation;
+
+        assembly {
+            // Set length of allocated array to 0
+            mstore(0x80, 0x0)
         }
     }
 
     function _appendCCIPslot(bytes32 slot) private pure {
+        console2.log("Go to here");
+
         unchecked {
             uint256 length;
             assembly {
@@ -170,6 +170,8 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
                 mstore(add(0x80, mul(length, 32)), slot)
             }
         }
+
+        console2.log("Go out here");
     }
 
     event CCIPSlot(bytes32 slot);
@@ -239,15 +241,23 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         returns (bytes memory result)
     {
         bool isCallback;
+        uint256 dbg;
         assembly {
             // If length > 32 then it's a callback pointer position because
             // Minimum pointer position = 4 (funcsig) + 32 (node) = 36
             isCallback := gt(mload(0x80), 32)
+            dbg := mload(0x80)
         }
+
+        console2.log("Start here");
 
         bytes32 s = _storageSlotCommon(schema, recipient, header);
 
+        console2.log("Get common storage", dbg);
+
         if (isCallback) {
+            console2.log("this is callback");
+
             (bytes32 slot, bytes memory data) = _readCCIPCallback();
             if (slot != s) {
                 revert InvalidSlot();
@@ -279,10 +289,11 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
     function _ccipBefore() internal view virtual override {
         bool isCallback = _isCCIPCallback();
 
+        _initCCIPFetch();
+
         if (isCallback) {
             _initCCIPCallback();
         } else {
-            _initCCIPFetch();
             _intCCIPFallback();
         }
     }

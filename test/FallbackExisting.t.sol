@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "test/setup/DeployCCIP.sol";
 
-// nick.eth: 0x05a67c0ee82964c4f7394cdd47fee7f4d9503a23c09c38341779ea012afe6e00
-
 bytes32 constant NICK_ETH = 0x05a67c0ee82964c4f7394cdd47fee7f4d9503a23c09c38341779ea012afe6e00;
 
 contract FallbackExistingTest is Test, DeployCCIP {

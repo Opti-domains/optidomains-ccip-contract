@@ -329,5 +329,18 @@ contract FallbackExistingTest is Test, DeployCCIP {
         _dnsNonOwner();
     }
 
-    function testDnsZone() public {}
+    function testDnsZonehash(bytes memory b) public {
+        vm.assume(b.length > 0);
+
+        vm.prank(NOT_NICK_OWNER);
+        vm.expectRevert();
+        resolver.setZonehash(NICK_ETH, b);
+        vm.stopPrank();
+
+        vm.prank(NICK_OWNER);
+        resolver.setZonehash(NICK_ETH, b);
+        vm.stopPrank();
+
+        assertEq(resolver.zonehash(NICK_ETH), b);
+    }
 }

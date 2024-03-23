@@ -64,8 +64,7 @@ contract FallbackExistingTest is Test, DeployCCIP {
         assertEq(resolver.text(NICK_ETH, "com.twitter"), s);
     }
 
-    function testTextNew() public {
-        string memory s = "xxx";
+    function testTextNew(string memory s) public {
         vm.assume(bytes(s).length > 0);
 
         vm.prank(NOT_NICK_OWNER);
@@ -201,37 +200,133 @@ contract FallbackExistingTest is Test, DeployCCIP {
     }
 
     function _dnsBasic() internal {
+        // a.eth. 3600 IN A 1.2.3.4
         bytes memory arec = hex"016103657468000001000100000e10000401020304";
+        // b.eth. 3600 IN A 2.3.4.5
         bytes memory b1rec = hex"016203657468000001000100000e10000402030405";
+        // b.eth. 3600 IN A 3.4.5.6
         bytes memory b2rec = hex"016203657468000001000100000e10000403040506";
+        // eth. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.eth. 2018061501 15620 1800 1814400 14400
         bytes memory soarec =
             hex"03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbd00003d0400000708001baf8000003840";
         bytes memory rec = bytes.concat(arec, b1rec, b2rec, soarec);
 
         vm.prank(NICK_OWNER);
-        // OptiL1PublicResolverFallback(0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41).setDNSRecords(NICK_ETH, rec);
         resolver.setDNSRecords(NICK_ETH, rec);
         vm.stopPrank();
 
-        (bytes memory dnsName,) = NameEncoder.dnsEncodeName("a.eth");
+        (bytes memory aEth,) = NameEncoder.dnsEncodeName("a.eth");
+        (bytes memory bEth,) = NameEncoder.dnsEncodeName("b.eth");
+        (bytes memory eth,) = NameEncoder.dnsEncodeName("eth");
 
         assertEq(
-            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(dnsName)), 1),
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(aEth)), 1),
             hex"016103657468000001000100000e10000401020304"
+        );
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(bEth)), 1),
+            hex"016203657468000001000100000e10000402030405016203657468000001000100000e10000403040506"
+        );
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(eth)), 6),
+            hex"03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbd00003d0400000708001baf8000003840"
         );
     }
 
-    function _dnsUpdateExisting() internal {}
+    function _dnsUpdateExisting() internal {
+        // a.eth. 3600 IN A 4.5.6.7
+        bytes memory arec = hex"016103657468000001000100000e10000404050607";
+        // eth. 86400 IN SOA ns1.ethdns.xyz. hostmaster.test.eth. 2018061502 15620 1800 1814400 14400
+        bytes memory soarec =
+            hex"03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbe00003d0400000708001baf8000003840";
+        bytes memory rec = bytes.concat(arec, soarec);
 
-    function _dnsKeepTrack() internal {}
+        vm.prank(NICK_OWNER);
+        resolver.setDNSRecords(NICK_ETH, rec);
+        vm.stopPrank();
 
-    function _dnsSingleRecord() internal {}
+        (bytes memory aEth,) = NameEncoder.dnsEncodeName("a.eth");
+        (bytes memory eth,) = NameEncoder.dnsEncodeName("eth");
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(aEth)), 1),
+            hex"016103657468000001000100000e10000404050607"
+        );
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(eth)), 6),
+            hex"03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbe00003d0400000708001baf8000003840"
+        );
+    }
+
+    function _dnsKeepTrack() internal {
+        // c.eth. 3600 IN A 1.2.3.4
+        bytes memory crec = hex"016303657468000001000100000e10000401020304";
+
+        vm.prank(NICK_OWNER);
+        resolver.setDNSRecords(NICK_ETH, crec);
+        vm.stopPrank();
+
+        (bytes memory cEth,) = NameEncoder.dnsEncodeName("c.eth");
+        (bytes memory dEth,) = NameEncoder.dnsEncodeName("d.eth");
+
+        assertEq(resolver.hasDNSRecords(NICK_ETH, keccak256(abi.encodePacked(cEth))), true);
+
+        // Note: can't return false as it will fallback to OffchainLookup
+        vm.expectRevert();
+        resolver.hasDNSRecords(NICK_ETH, keccak256(abi.encodePacked(dEth)));
+
+        vm.prank(NICK_OWNER);
+        resolver.setDNSRecords(NICK_ETH, crec);
+        vm.stopPrank();
+
+        assertEq(resolver.hasDNSRecords(NICK_ETH, keccak256(abi.encodePacked(cEth))), true);
+
+        // c.eth. 3600 IN A
+        crec = hex"016303657468000001000100000e100000";
+
+        vm.prank(NICK_OWNER);
+        resolver.setDNSRecords(NICK_ETH, crec);
+        vm.stopPrank();
+
+        // Note: can't return false as it will fallback to OffchainLookup
+        vm.expectRevert();
+        resolver.hasDNSRecords(NICK_ETH, keccak256(abi.encodePacked(cEth)));
+    }
+
+    function _dnsSingleRecord() internal {
+        // e.eth. 3600 IN A 1.2.3.4
+        bytes memory erec = hex"016503657468000001000100000e10000401020304";
+
+        vm.prank(NICK_OWNER);
+        resolver.setDNSRecords(NICK_ETH, erec);
+        vm.stopPrank();
+
+        (bytes memory eEth,) = NameEncoder.dnsEncodeName("e.eth");
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(eEth)), 1),
+            hex"016503657468000001000100000e10000401020304"
+        );
+    }
+
+    function _dnsNonOwner() internal {
+        bytes memory frec = hex"016603657468000001000100000e10000401020304";
+
+        vm.prank(NOT_NICK_OWNER);
+        vm.expectRevert();
+        resolver.setDNSRecords(NICK_ETH, frec);
+        vm.stopPrank();
+    }
 
     function testDns() public {
         _dnsBasic();
         _dnsUpdateExisting();
         _dnsKeepTrack();
         _dnsSingleRecord();
+        _dnsNonOwner();
     }
 
     function testDnsZone() public {}

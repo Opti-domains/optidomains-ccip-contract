@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./IOptiL1ResolverFallback.sol";
+import {Script, console2} from "forge-std/Script.sol";
 
 contract OptiL1ResolverFallback is OwnableUpgradeable, IOptiL1ResolverFallback {
     using Address for address;
@@ -92,6 +93,8 @@ contract OptiL1ResolverFallback is OwnableUpgradeable, IOptiL1ResolverFallback {
     }
 
     function write(address caller, bytes calldata data) external {
+        console2.log("write");
+
         if (msg.sender != ccipResolver) revert NotCCIP();
         bytes memory response = writeResolver.functionCall(abi.encodePacked(data, caller));
 

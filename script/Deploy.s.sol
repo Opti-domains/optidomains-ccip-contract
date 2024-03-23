@@ -252,8 +252,8 @@ contract Deploy is Script {
             );
         }
 
-        console2.log("OptiL1ResolverMetadata:", address(resolverMetadata));
-        console2.log("DiamondResolver:", address(diamondResolver));
+        // console2.log("OptiL1ResolverMetadata:", address(resolverMetadata));
+        // console2.log("DiamondResolver:", address(diamondResolver));
     }
 
     function runBroadcast() public env broadcast {
@@ -265,10 +265,10 @@ contract Deploy is Script {
     }
 
     function scratchpad() public {
-        OptiL1PublicResolverFallback resolver = OptiL1PublicResolverFallback(address(diamondResolver));
+        // OptiL1PublicResolverFallback resolver = OptiL1PublicResolverFallback(address(diamondResolver));
         // address addr = resolver.addr(0x1a63898c3849a1c65b7e5b98128ab7f7d61ba88b58e5c89f445b9ef5db234349);
         // console2.log(addr);
-        resolver.text(0x1a63898c3849a1c65b7e5b98128ab7f7d61ba88b58e5c89f445b9ef5db234349, "newrecord");
+        // resolver.text(0x1a63898c3849a1c65b7e5b98128ab7f7d61ba88b58e5c89f445b9ef5db234349, "newrecord");
     }
 
     function run() public env {

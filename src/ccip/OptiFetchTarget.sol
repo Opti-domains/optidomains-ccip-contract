@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
-import {RLPReader} from "@eth-optimism/contracts-bedrock/src/libraries/rlp/RLPReader.sol";
+import {RLPReader} from "../eth-optimism/rlp/RLPReader.sol";
 import {StateProof, EVMProofHelper} from "@ensdomains/evm-verifier/contracts/EVMProofHelper.sol";
-import {Types} from "@eth-optimism/contracts-bedrock/src/libraries/Types.sol";
+import {Types} from "../eth-optimism/Types.sol";
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Attestation} from "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
@@ -133,7 +133,7 @@ abstract contract OptiFetchTarget {
 
             uint256 extraDataLength = 0;
             bytes memory extraData;
-            
+
             assembly {
                 // Allocate a byte for length
                 extraData := mload(0x40)

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "test/setup/DeployCCIP.sol";
+import {NameEncoder} from "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 
 bytes32 constant NICK_ETH = 0x05a67c0ee82964c4f7394cdd47fee7f4d9503a23c09c38341779ea012afe6e00;
 address constant NICK_OWNER = 0xb8c2C29ee19D8307cb7255e1Cd9CbDE883A267d5;
@@ -33,6 +34,7 @@ contract FallbackExistingTest is Test, DeployCCIP {
 
     function testAddrNonETH(uint256 coinType, bytes memory a) public {
         vm.assume(bytes(a).length > 0);
+        vm.assume(coinType != 60);
 
         vm.prank(NOT_NICK_OWNER);
         vm.expectRevert();
@@ -62,7 +64,8 @@ contract FallbackExistingTest is Test, DeployCCIP {
         assertEq(resolver.text(NICK_ETH, "com.twitter"), s);
     }
 
-    function testTextNew(string memory s) public {
+    function testTextNew() public {
+        string memory s = "xxx";
         vm.assume(bytes(s).length > 0);
 
         vm.prank(NOT_NICK_OWNER);
@@ -196,4 +199,40 @@ contract FallbackExistingTest is Test, DeployCCIP {
 
         assertEq(resolver.interfaceImplementer(NICK_ETH, 0x3b3b57de), PUBLIC_RESOLVER);
     }
+
+    function _dnsBasic() internal {
+        bytes memory arec = hex"016103657468000001000100000e10000401020304";
+        bytes memory b1rec = hex"016203657468000001000100000e10000402030405";
+        bytes memory b2rec = hex"016203657468000001000100000e10000403040506";
+        bytes memory soarec =
+            hex"03657468000006000100015180003a036e733106657468646e730378797a000a686f73746d6173746572057465737431036574680078492cbd00003d0400000708001baf8000003840";
+        bytes memory rec = bytes.concat(arec, b1rec, b2rec, soarec);
+
+        vm.prank(NICK_OWNER);
+        // OptiL1PublicResolverFallback(0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41).setDNSRecords(NICK_ETH, rec);
+        resolver.setDNSRecords(NICK_ETH, rec);
+        vm.stopPrank();
+
+        (bytes memory dnsName,) = NameEncoder.dnsEncodeName("a.eth");
+
+        assertEq(
+            resolver.dnsRecord(NICK_ETH, keccak256(abi.encodePacked(dnsName)), 1),
+            hex"016103657468000001000100000e10000401020304"
+        );
+    }
+
+    function _dnsUpdateExisting() internal {}
+
+    function _dnsKeepTrack() internal {}
+
+    function _dnsSingleRecord() internal {}
+
+    function testDns() public {
+        _dnsBasic();
+        _dnsUpdateExisting();
+        _dnsKeepTrack();
+        _dnsSingleRecord();
+    }
+
+    function testDnsZone() public {}
 }

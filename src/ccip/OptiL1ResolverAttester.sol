@@ -13,10 +13,6 @@ import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";
 import {Script, console2} from "forge-std/Script.sol";
 
-uint256 constant FreeMemoryOccupied_error_signature =
-    (0x3e9fd85b00000000000000000000000000000000000000000000000000000000);
-uint256 constant FreeMemoryOccupied_error_length = 0x20;
-
 // keccak256("CCIP_CALLBACK_SELECTOR")
 bytes32 constant CCIP_CALLBACK_SELECTOR = (0x008005059b29fe32430d77b550e3fd6faed6e319156c99f488cac9c10006b476);
 
@@ -25,6 +21,7 @@ bytes32 constant DNS_ENCODED_NAME_SELECTOR = (0x1bc8709fa4e9a9a9d0c17c26a82f1a28
 
 bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
 
+error FreeMemoryOccupied();
 error CCIPSlotOverflow();
 error PleaseWriteOnL2();
 error InvalidSlot();
@@ -55,12 +52,6 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
     function _isCCIPCallback() private view returns (bool result) {
         // Verify the following format: [funcsig[4], ..., len[32], keccak256(prevrandao, CCIP_CALLBACK_SELECTOR)[32]]
         assembly {
-            // If free memory pointer is not at 0x80 then revert
-            if iszero(eq(mload(0x40), 0x80)) {
-                mstore(0, FreeMemoryOccupied_error_signature)
-                revert(0, FreeMemoryOccupied_error_length)
-            }
-
             // Load calldata size
             let calldataLength := calldatasize()
 
@@ -83,7 +74,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
     function _initCCIPCallback() private pure {
         assembly {
             // Allocate calldata pointer to the first slot
-            mstore(0x80, calldataload(sub(calldatasize(), 0x40)))
+            mstore(0xC0, calldataload(sub(calldatasize(), 0x40)))
         }
     }
 
@@ -94,7 +85,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
             assembly {
                 // Load calldata pointer
-                p := mload(0x80)
+                p := mload(0xC0)
 
                 // First value is the slot
                 slot := calldataload(p)
@@ -110,7 +101,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
             assembly {
                 // Move new pointer to the next calldata
-                mstore(0x80, add(p, dataLength))
+                mstore(0xC0, add(p, dataLength))
             }
         }
     }
@@ -129,23 +120,25 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         }
     }
 
-    function _initCCIPFetch() private pure {
+    function _initCCIPFetch() private view returns (bool isInitial) {
+        bool isOccupied = false;
         assembly {
-            // If free memory pointer is not at 0x80 then revert
-            if iszero(eq(mload(0x40), 0x80)) {
-                mstore(0, FreeMemoryOccupied_error_signature)
-                revert(0, FreeMemoryOccupied_error_length)
+            // If 0x80 is marked with prevrandao then it is initialized
+            if iszero(eq(mload(0x80), prevrandao())) {
+                // Mark as the first initialization
+                isInitial := true
+
+                if iszero(eq(mload(0x40), 0x80)) { isOccupied := true }
+
+                // Mark 0x80 with prevrandao to indicate that ccip fetch has been initialized
+                mstore(0x80, prevrandao())
+
+                // Move free memory pointer to slot 35
+                mstore(0x40, 0x4E0)
             }
         }
 
-        // We need to allocate memory this way, otherwise solidity compiler may take over this slot.
-        bytes32[] memory allocation = new bytes32[](32);
-        allocation;
-
-        assembly {
-            // Set length of allocated array to 0
-            mstore(0x80, 0x0)
-        }
+        if (isOccupied) revert FreeMemoryOccupied();
     }
 
     function _appendCCIPslot(bytes32 slot) private pure {
@@ -155,7 +148,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
             uint256 length;
             assembly {
                 // Fetch length from the first memory pointer
-                length := add(mload(0x80), 1)
+                length := add(mload(0xC0), 1)
             }
 
             if (length > 32) {
@@ -164,10 +157,10 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
             assembly {
                 // Increase length of array
-                mstore(0x80, length)
+                mstore(0xC0, length)
 
                 // Push slot to the end of array
-                mstore(add(0x80, mul(length, 32)), slot)
+                mstore(add(0xC0, mul(length, 32)), slot)
             }
         }
 
@@ -180,7 +173,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         unchecked {
             bytes32[] memory slots;
             assembly {
-                slots := 0x80
+                slots := 0xC0
             }
 
             bytes32 ensNode = bytes32(msg.data[4:36]);
@@ -245,8 +238,8 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         assembly {
             // If length > 32 then it's a callback pointer position because
             // Minimum pointer position = 4 (funcsig) + 32 (node) = 36
-            isCallback := gt(mload(0x80), 32)
-            dbg := mload(0x80)
+            isCallback := gt(mload(0xC0), 32)
+            dbg := mload(0xC0)
         }
 
         console2.log("Start here");
@@ -271,6 +264,11 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
     function _writeFallback() internal {
         // This function will return globally
         IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).write(msg.sender, msg.data);
+
+        // Force end the transaction
+        assembly {
+            return(0, 0)
+        }
     }
 
     function _write(bytes32, address, uint64, bool, bytes memory, bytes memory)
@@ -286,15 +284,16 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         _writeFallback();
     }
 
-    function _ccipBefore() internal view virtual override {
+    function _ccipBefore() internal view virtual override returns (bool isInitial) {
+        isInitial = _initCCIPFetch();
         bool isCallback = _isCCIPCallback();
 
-        _initCCIPFetch();
-
-        if (isCallback) {
-            _initCCIPCallback();
-        } else {
-            _intCCIPFallback();
+        if (isInitial) {
+            if (isCallback) {
+                _initCCIPCallback();
+            } else {
+                _intCCIPFallback();
+            }
         }
     }
 
@@ -303,7 +302,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         assembly {
             // If length > 32 then it's a callback pointer position because
             // Minimum pointer position = 4 (funcsig) + 32 (node) = 36
-            isCallback := gt(mload(0x80), 32)
+            isCallback := gt(mload(0xC0), 32)
         }
 
         if (!isCallback) {

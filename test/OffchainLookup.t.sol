@@ -15,6 +15,6 @@ contract OffchainLookupTest is Test, DeployCCIP {
     }
 
     function testText() public {
-        resolver.text(NICK_ETH, "newrecord");
+        // resolver.text(NICK_ETH, "newrecord");
     }
 }

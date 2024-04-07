@@ -105,20 +105,6 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         }
     }
 
-    function _initCCIPFallback() private view {
-        unchecked {
-            (bool success, bytes memory response) = OPTI_L1_RESOLVER_METADATA.staticcall(msg.data);
-
-            if (success) {
-                // Forward low level call return data
-                assembly {
-                    // Return response removing length prefix (0x20)
-                    return(add(response, 0x20), mload(response))
-                }
-            }
-        }
-    }
-
     function _initCCIPFetch() private view returns (bool isInitial) {
         bool isOccupied = false;
         assembly {
@@ -287,13 +273,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         isInitial = _initCCIPFetch();
         bool isCallback = _isCCIPCallback();
 
-        if (isInitial) {
-            if (isCallback) {
-                _initCCIPCallback();
-            } else {
-                _initCCIPFallback();
-            }
-        }
+        if (isInitial && isCallback) _initCCIPCallback();
     }
 
     function _ccipAfter() internal view virtual override {
@@ -304,9 +284,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
             isCallback := gt(mload(0xC0), 32)
         }
 
-        if (!isCallback) {
-            _finalizeCCIP();
-        }
+        if (!isCallback) _finalizeCCIP();
     }
 
     function _isAuthorised(bytes32) internal view virtual override returns (bool) {

@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ICREATE3Factory} from "lib/create3-factory/src/ICREATE3Factory.sol";
-import {DiamondResolver} from "@optidomains/modular-ens-contracts/current/diamond/DiamondResolver.sol";
 import {IDiamondWritableInternal} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritableInternal.sol";
 
 import "src/metadata/OptiL1Metadata.sol";
 import {OptiL1PublicResolverFacet} from "src/facet/OptiL1PublicResolverFacet.sol";
 import {OptiL1PublicResolverFallback} from "src/metadata/OptiL1PublicResolverFallback.sol";
+import {OptiL1DiamondResolver} from "src/ccip/OptiL1DiamondResolver.sol";
 
 address constant DEPLOYER = 0x424242554b027D8661cf60C87195949f8426BCA5;
 
@@ -30,7 +30,7 @@ contract Deploy is Script {
     using Strings for uint256;
 
     OptiL1Metadata public resolverMetadata;
-    DiamondResolver public diamondResolver;
+    OptiL1DiamondResolver public diamondResolver;
     OptiL1PublicResolverFallback public publicResolverFallback;
 
     string RPC_URL;
@@ -97,21 +97,21 @@ contract Deploy is Script {
         return (OptiL1Metadata(payable(deployed)), true);
     }
 
-    function deployDiamondResolver(address owner) internal returns (DiamondResolver, bool) {
+    function deployDiamondResolver(address owner) internal returns (OptiL1DiamondResolver, bool) {
         address target = ICREATE3Factory(CREATE3FACTORY).getDeployed(DEPLOYER, DIAMOND_RESOLVER_SALT);
 
         if (target.code.length > 0) {
-            return (DiamondResolver(payable(target)), false);
+            return (OptiL1DiamondResolver(payable(target)), false);
         }
 
         address deployed = ICREATE3Factory(CREATE3FACTORY).deploy(
-            DIAMOND_RESOLVER_SALT, abi.encodePacked(type(DiamondResolver).creationCode, abi.encode(owner))
+            DIAMOND_RESOLVER_SALT, abi.encodePacked(type(OptiL1DiamondResolver).creationCode, abi.encode(owner))
         );
 
-        return (DiamondResolver(payable(deployed)), true);
+        return (OptiL1DiamondResolver(payable(deployed)), true);
     }
 
-    function registerPublicResolverFacet(DiamondResolver diamond, IDiamondWritableInternal.FacetCutAction action)
+    function registerPublicResolverFacet(OptiL1DiamondResolver diamond, IDiamondWritableInternal.FacetCutAction action)
         internal
     {
         OptiL1PublicResolverFacet facet = new OptiL1PublicResolverFacet();

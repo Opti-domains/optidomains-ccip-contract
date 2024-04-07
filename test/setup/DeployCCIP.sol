@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {console2} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {Deploy, OptiL1ResolverMetadata, DiamondResolver, OptiL1PublicResolverFallback} from "script/Deploy.s.sol";
+import {Deploy, OptiL1Metadata, DiamondResolver, OptiL1PublicResolverFallback} from "script/Deploy.s.sol";
 
 contract DeployCCIP {
     /// @notice The address of the foundry Vm contract.
@@ -13,7 +13,7 @@ contract DeployCCIP {
     ///         mutating any nonces. MUST not have constructor logic.
     Deploy internal constant deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
 
-    OptiL1ResolverMetadata resolverMetadata;
+    OptiL1Metadata resolverMetadata;
     DiamondResolver diamondResolver;
     OptiL1PublicResolverFallback publicResolverFallback;
 

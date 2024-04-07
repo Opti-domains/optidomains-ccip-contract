@@ -7,8 +7,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
 import "@optidomains/modular-ens-contracts/current/resolver/attester/OptiResolverAttesterBase.sol";
 import "@optidomains/modular-ens-contracts/current/resolver/auth/OptiResolverAuth.sol";
-import "../metadata/IOptiL1ResolverMetadata.sol";
-import "./OptiL1ResolverStorage.sol";
+import "../metadata/IOptiL1Metadata.sol";
 import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";
 import {Script, console2} from "forge-std/Script.sol";
@@ -106,7 +105,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
         }
     }
 
-    function _intCCIPFallback() private view {
+    function _initCCIPFallback() private view {
         unchecked {
             (bool success, bytes memory response) = OPTI_L1_RESOLVER_METADATA.staticcall(msg.data);
 
@@ -218,7 +217,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
             revert OffchainLookup(
                 address(this),
-                IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).gatewayURLs(),
+                IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).gatewayURLs(),
                 abi.encodeCall(IOptiL1Gateway.getAttestations, (ensNode, slots, dnsEncodedName)),
                 OptiFetchTarget.ccipAttCallback.selector,
                 abi.encode(ensNode, slots, msg.data)
@@ -263,7 +262,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
 
     function _writeFallback() internal {
         // This function will return globally
-        IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).write(msg.sender, msg.data);
+        IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).write(msg.sender, msg.data);
 
         // Force end the transaction
         assembly {
@@ -292,7 +291,7 @@ contract OptiL1ResolverAttester is OptiResolverAttesterBase, OptiResolverAuth {
             if (isCallback) {
                 _initCCIPCallback();
             } else {
-                _intCCIPFallback();
+                _initCCIPFallback();
             }
         }
     }

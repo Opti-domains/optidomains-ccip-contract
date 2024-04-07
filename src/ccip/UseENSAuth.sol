@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@ensdomains/ens-contracts/registry/ENS.sol";
 import "@ensdomains/ens-contracts/wrapper/INameWrapper.sol";
-import "../metadata/IOptiL1ResolverMetadata.sol";
-import {OPTI_L1_RESOLVER_METADATA} from "../metadata/OptiL1ResolverMetadataAddress.sol";
+import "../metadata/IOptiL1Metadata.sol";
 
 address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
 
@@ -19,7 +18,7 @@ contract UseENSAuth {
 
     function isAuthorised(address sender, bytes32 node) internal view virtual returns (bool) {
         address owner = ENS(ENS_REGISTRY).owner(node);
-        address nameWrapper = IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).nameWrapper();
+        address nameWrapper = IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).configAddr(METADATA_NAME_WRAPPER);
         if (owner == nameWrapper) {
             owner = INameWrapper(nameWrapper).ownerOf(uint256(node));
         }

@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {EVMFetcher} from "@ensdomains/evm-verifier/contracts/EVMFetcher.sol";
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
-import {IOptiL1ResolverMetadata} from "../metadata/IOptiL1ResolverMetadata.sol";
-import {OPTI_L1_RESOLVER_METADATA} from "../metadata/OptiL1ResolverMetadataAddress.sol";
+import "../metadata/IOptiL1Metadata.sol";
 
 library OptiL1ResolverUtils {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
@@ -16,19 +15,12 @@ library OptiL1ResolverUtils {
             request.commands[commandIdx] | (bytes32(bytes1(op)) >> (8 * request.operationIdx++));
     }
 
-    function getOpResolverAddress(bytes32 opNode) public view returns (address predictedAddress) {
-        address opBaseResolver = IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).opBaseResolver();
-        bytes32 saltHash =
-            keccak256(abi.encodePacked(IOptiL1ResolverMetadata(OPTI_L1_RESOLVER_METADATA).opRegistry(), opNode));
-        predictedAddress = Clones.predictDeterministicAddress(opBaseResolver, saltHash, opBaseResolver);
-    }
-
     function buildAttFetchRequest(bytes32 opNode, bytes32[] calldata slots)
         public
         view
         returns (EVMFetcher.EVMFetchRequest memory request, address target)
     {
-        target = getOpResolverAddress(opNode);
+        target = IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).configAddr(METADATA_OP_STORAGE);
         request = EVMFetcher.newFetchRequest(IEVMVerifier(address(this)), target);
 
         unchecked {

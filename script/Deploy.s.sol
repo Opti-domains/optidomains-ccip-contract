@@ -7,35 +7,29 @@ import {ICREATE3Factory} from "lib/create3-factory/src/ICREATE3Factory.sol";
 import {DiamondResolver} from "@optidomains/modular-ens-contracts/current/diamond/DiamondResolver.sol";
 import {IDiamondWritableInternal} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritableInternal.sol";
 
-import {
-    OptiL1ResolverMetadata,
-    OptiL1ResolverFallback,
-    IOptiL1ResolverMetadata
-} from "src/metadata/OptiL1ResolverMetadata.sol";
-import {OwnableUpgradeableProxy} from "src/proxy/OwnableUpgradeableProxy.sol";
-import {OptiL1PublicResolverFallback, ENS, INameWrapper} from "src/fallback/OptiL1PublicResolverFallback.sol";
+import "src/metadata/OptiL1Metadata.sol";
 import {OptiL1PublicResolverFacet} from "src/facet/OptiL1PublicResolverFacet.sol";
-import {OptiL1ResolverControllerFacet} from "src/facet/OptiL1ResolverControllerFacet.sol";
+import {OptiL1PublicResolverFallback} from "src/metadata/OptiL1PublicResolverFallback.sol";
 
 address constant DEPLOYER = 0x424242554b027D8661cf60C87195949f8426BCA5;
 
 address constant CREATE3FACTORY = 0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf;
 
 // 0x4242ff8798CdDFf600c41c818F4f9d3E922B609f
-bytes32 constant RESOLVER_METADATA_SALT = 0x0000000000000000000000000000000000000000f75b656fc843dfea68723db7;
+bytes32 constant METADATA_SALT = 0x0000000000000000000000000000000000000000f75b656fc843dfea68723db7;
 
 // 0x4242008c912fEA62C3fe4C8d4Cd4eD3319738ef0
 bytes32 constant DIAMOND_RESOLVER_SALT = 0x0000000000000000000000000000000000000000ae1787e6c414de748181697a;
 
-address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
+// address constant ENS_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
 address constant OP_REGISTRY = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
-address constant OP_BASE_RESOLVER = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
+address constant OP_STORAGE = 0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e;
 bytes32 constant OP_NAMEHASH = 0x070904f45402bbf3992472be342c636609db649a8ec20a8aaa65faaafd4b8701;
 
 contract Deploy is Script {
     using Strings for uint256;
 
-    OptiL1ResolverMetadata public resolverMetadata;
+    OptiL1Metadata public resolverMetadata;
     DiamondResolver public diamondResolver;
     OptiL1PublicResolverFallback public publicResolverFallback;
 
@@ -45,7 +39,6 @@ contract Deploy is Script {
     address[] OFFICIAL_RESOLVERS;
     string[] GATEWAY_URLS;
 
-    bool UPGRADE_RESOLVER_METADATA;
     bool UPGRADE_PUBLIC_RESOLVER_FALLBACK;
     bool UPGRADE_PUBLIC_RESOLVER_FACET;
     bool UPGRADE_RESOLVER_CONTROLLER_FACET;
@@ -57,7 +50,6 @@ contract Deploy is Script {
         OFFICIAL_RESOLVERS = vm.envAddress(string.concat("OFFICIAL_RESOLVERS_", block.chainid.toString()), ",");
         GATEWAY_URLS = vm.envString("GATEWAY_URLS", ",");
 
-        UPGRADE_RESOLVER_METADATA = vm.envOr("UPGRADE_RESOLVER_METADATA", false);
         UPGRADE_PUBLIC_RESOLVER_FALLBACK = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FALLBACK", false);
         UPGRADE_PUBLIC_RESOLVER_FACET = vm.envOr("UPGRADE_PUBLIC_RESOLVER_FACET", false);
         UPGRADE_RESOLVER_CONTROLLER_FACET = vm.envOr("UPGRADE_RESOLVER_CONTROLLER_FACET", false);
@@ -75,7 +67,6 @@ contract Deploy is Script {
 
     /// @notice Modifier that wraps a function in broadcasting for debug mode.
     modifier debug() {
-        UPGRADE_RESOLVER_METADATA = true;
         UPGRADE_PUBLIC_RESOLVER_FALLBACK = true;
         UPGRADE_PUBLIC_RESOLVER_FACET = true;
         UPGRADE_RESOLVER_CONTROLLER_FACET = true;
@@ -88,27 +79,22 @@ contract Deploy is Script {
 
     function setUp() public {}
 
-    function deployResolverMetadata() internal returns (OptiL1ResolverMetadata) {
-        return new OptiL1ResolverMetadata();
-    }
-
     function deployPublicResolverFallback(address l1ResolverFallback) internal returns (OptiL1PublicResolverFallback) {
         return new OptiL1PublicResolverFallback(ENS(ENS_REGISTRY), INameWrapper(NAME_WRAPPER), l1ResolverFallback);
     }
 
-    function deployResolverMetadataProxy(address impl, address owner) internal returns (OptiL1ResolverMetadata, bool) {
-        address target = ICREATE3Factory(CREATE3FACTORY).getDeployed(DEPLOYER, RESOLVER_METADATA_SALT);
+    function deployMetadata(address owner) internal returns (OptiL1Metadata, bool) {
+        address target = ICREATE3Factory(CREATE3FACTORY).getDeployed(DEPLOYER, METADATA_SALT);
 
         if (target.code.length > 0) {
-            return (OptiL1ResolverMetadata(payable(target)), false);
+            return (OptiL1Metadata(payable(target)), false);
         }
 
         address deployed = ICREATE3Factory(CREATE3FACTORY).deploy(
-            RESOLVER_METADATA_SALT,
-            abi.encodePacked(type(OwnableUpgradeableProxy).creationCode, abi.encode(impl, owner))
+            METADATA_SALT, abi.encodePacked(type(OptiL1Metadata).creationCode, abi.encode(owner, OP_NAMEHASH))
         );
 
-        return (OptiL1ResolverMetadata(payable(deployed)), true);
+        return (OptiL1Metadata(payable(deployed)), true);
     }
 
     function deployDiamondResolver(address owner) internal returns (DiamondResolver, bool) {
@@ -166,46 +152,11 @@ contract Deploy is Script {
         diamond.diamondCut(facetCuts, address(facet), abi.encodeWithSelector(0x8129fc1c));
     }
 
-    function registerResolverControllerFacet(
-        DiamondResolver diamond,
-        IDiamondWritableInternal.FacetCutAction action,
-        bytes32 tldNameHash
-    ) internal {
-        OptiL1ResolverControllerFacet facet = new OptiL1ResolverControllerFacet();
-
-        bytes4[] memory selectors = new bytes4[](4);
-        uint256 selectorIndex;
-
-        selectors[selectorIndex++] = 0x15346a5f; // setTarget(bytes32,bytes32)
-        selectors[selectorIndex++] = 0x90c9d877; // target(bytes32)
-        selectors[selectorIndex++] = 0xfca56f27; // enableWildcard(bytes32,bool)
-        selectors[selectorIndex++] = 0xdbae4c62; // isWildcardEnabled(bytes32)
-
-        IDiamondWritableInternal.FacetCut[] memory facetCuts = new IDiamondWritableInternal.FacetCut[](1);
-
-        facetCuts[0] = IDiamondWritableInternal.FacetCut({target: address(facet), action: action, selectors: selectors});
-
-        // Diamond cut and initialize
-        diamond.diamondCut(facetCuts, address(facet), abi.encodeWithSelector(0x9498bd71, tldNameHash));
-    }
-
     function _run() internal {
         bool resolverMetadataInitMode = false;
         bool diamondResolverInitMode = false;
 
-        if (UPGRADE_RESOLVER_METADATA) {
-            OptiL1ResolverMetadata resolverMetadataImpl = deployResolverMetadata();
-            (resolverMetadata, resolverMetadataInitMode) =
-                deployResolverMetadataProxy(address(resolverMetadataImpl), DEPLOYER);
-
-            if (!resolverMetadataInitMode) {
-                OwnableUpgradeableProxy(payable(address(resolverMetadata))).setImplementation(
-                    address(resolverMetadataImpl)
-                );
-            }
-        } else {
-            (resolverMetadata, resolverMetadataInitMode) = deployResolverMetadataProxy(address(0), msg.sender);
-        }
+        (resolverMetadata, resolverMetadataInitMode) = deployMetadata(DEPLOYER);
 
         if (UPGRADE_PUBLIC_RESOLVER_FALLBACK) {
             publicResolverFallback = deployPublicResolverFallback(address(resolverMetadata));
@@ -213,24 +164,43 @@ contract Deploy is Script {
             OFFICIAL_RESOLVERS.push(address(publicResolverFallback));
 
             if (!resolverMetadataInitMode) {
-                resolverMetadata.setWriteResolver(address(publicResolverFallback));
+                resolverMetadata.set(
+                    METADATA_WRITE_RESOLVER, bytes32(uint256(uint160(address(publicResolverFallback))))
+                );
+
+                address[] memory publicResolverFallbackArray = new address[](1);
+                publicResolverFallbackArray[0] = address(publicResolverFallback);
+
+                resolverMetadata.initParams(
+                    new bytes32[](0), new bytes32[](0), new string[](0), publicResolverFallbackArray
+                );
             }
         } else {
-            publicResolverFallback = OptiL1PublicResolverFallback(resolverMetadata.writeResolver());
+            publicResolverFallback = OptiL1PublicResolverFallback(resolverMetadata.configAddr(METADATA_WRITE_RESOLVER));
         }
 
         (diamondResolver, diamondResolverInitMode) = deployDiamondResolver(DEPLOYER);
 
         if (resolverMetadataInitMode) {
-            resolverMetadata.initParams(
-                address(publicResolverFallback),
-                address(diamondResolver),
-                OP_REGISTRY,
-                OP_BASE_RESOLVER,
-                NAME_WRAPPER,
-                OFFICIAL_RESOLVERS,
-                GATEWAY_URLS
-            );
+            bytes32[] memory keys = new bytes32[](5);
+            bytes32[] memory values = new bytes32[](5);
+
+            keys[0] = METADATA_CCIP_RESOLVER;
+            values[0] = bytes32(uint256(uint160(address(diamondResolver))));
+
+            keys[1] = METADATA_WRITE_RESOLVER;
+            values[1] = bytes32(uint256(uint160(address(publicResolverFallback))));
+
+            keys[2] = METADATA_OP_REGISTRY;
+            values[2] = bytes32(uint256(uint160(OP_REGISTRY)));
+
+            keys[3] = METADATA_OP_STORAGE;
+            values[3] = bytes32(uint256(uint160(OP_STORAGE)));
+
+            keys[4] = METADATA_NAME_WRAPPER;
+            values[4] = bytes32(uint256(uint160(NAME_WRAPPER)));
+
+            resolverMetadata.initParams(keys, values, GATEWAY_URLS, OFFICIAL_RESOLVERS);
         }
 
         if (UPGRADE_PUBLIC_RESOLVER_FACET) {
@@ -239,16 +209,6 @@ contract Deploy is Script {
                 diamondResolverInitMode
                     ? IDiamondWritableInternal.FacetCutAction.ADD
                     : IDiamondWritableInternal.FacetCutAction.REPLACE
-            );
-        }
-
-        if (UPGRADE_RESOLVER_CONTROLLER_FACET) {
-            registerResolverControllerFacet(
-                diamondResolver,
-                diamondResolverInitMode
-                    ? IDiamondWritableInternal.FacetCutAction.ADD
-                    : IDiamondWritableInternal.FacetCutAction.REPLACE,
-                OP_NAMEHASH
             );
         }
 

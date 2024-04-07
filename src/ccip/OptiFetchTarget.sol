@@ -9,8 +9,8 @@ import {Types} from "../eth-optimism/Types.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Attestation} from "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
 
+import "../metadata/IOptiL1Metadata.sol";
 import "./OptiL1ResolverUtils.sol";
-import "./OptiL1ResolverStorage.sol";
 
 // https://docs.optimism.io/chain/addresses
 address constant OP_L2_OUTPUT_ORACLE = 0xdfe97868233d1aa22e815a266982f2cf17685a27;
@@ -182,8 +182,6 @@ abstract contract OptiFetchTarget {
      * @dev Internal callback function invoked by CCIP-Read in response to an attestation resolve request.
      */
     function ccipAttCallback(bytes calldata response, bytes calldata extradata) public view {
-        OptiL1ResolverStorage.Layout storage S = OptiL1ResolverStorage.layout();
-
         (
             bytes32 ensCommonNode,
             bytes32[] memory ensPaths,
@@ -197,7 +195,7 @@ abstract contract OptiFetchTarget {
 
         // Stage 1: Validate ENS Node and derive OP Node
 
-        bytes32 opNode = S.domainMapping[ensCommonNode];
+        bytes32 opNode = IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).target(ensCommonNode);
 
         if (opNode == bytes32(0)) {
             revert InvalidCommonNode();
@@ -213,7 +211,7 @@ abstract contract OptiFetchTarget {
                 if (i < opPathLength) {
                     opNode = keccak256(abi.encodePacked(opNode, ensPaths[i]));
                 } else {
-                    if (!S.enableWildcard[ensNode]) {
+                    if (!IOptiL1Metadata(OPTI_L1_RESOLVER_METADATA).wildcardEnabled(ensNode)) {
                         revert WildcardNotEnabled(ensNode);
                     }
                 }
